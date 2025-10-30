@@ -2,8 +2,6 @@
 
 **Curate your learning. See how ideas connect.**
 
-I built Glyph because I was drowning in articles but losing the connections between them. Every piece I read felt isolated, and I knew there were patterns I was missing.
-
 Glyph turns scattered reading into structured knowledge. Every article you capture becomes part of an intelligent graph that reveals patterns, connections, and insights across everything you've read.
 
 **If you learn by reading** - whether you're researching, practicing law, analyzing markets, or just trying to make sense of complex topics - Glyph helps you see the bigger picture.
@@ -19,7 +17,7 @@ Glyph turns scattered reading into structured knowledge. Every article you captu
 ## What It Does
 
 **Captures What Matters**
-Instead of saving everything, Glyph identifies the key people, companies, technologies, and concepts from each article. You can even right-click images to extract visual insights. When you have multiple tabs open, capture them all at once.
+Instead of saving everything, Glyph identifies the key people, companies, technologies, and concepts from each article. When you have multiple tabs open, capture them all at once.
 
 **Finds Hidden Connections**
 This is where it gets interesting - Glyph finds connections between articles you've read that you might have missed. After every few captures, it reveals new relationships and labels them meaningfully: "founded by", "competes with", "implements".
@@ -40,7 +38,6 @@ Ask questions and get answers drawn from your own curated knowledge. "What have 
 | **Ask questions** | Prompt API answers from your data → Rewriter polishes clarity |
 | **Weekly synthesis** | Writer API generates narrative summaries of your learning journey |
 | **"You've seen this"** | Prompt API extracts entities from current page → Matches your database |
-| **Right-click images** | Prompt API multimodal mode extracts visual insights |
 
 **5 Chrome AI APIs working together**: Prompt, Summarizer, Writer, Rewriter, Language Detector
 
@@ -65,8 +62,6 @@ Ask questions and get answers drawn from your own curated knowledge. "What have 
 **Step 4 - Visualize**: React loads data → D3.js renders force-directed graph → You explore connections
 
 **Step 5 - Learn**: Ask questions → AI answers from your curated knowledge → Insights deepen
-
-Right-click any image → Multimodal extraction adds visual insights to your graph
 
 ## What I Learned Building This
 
@@ -94,8 +89,7 @@ Load `dist/` in chrome://extensions/ → Start capturing
 
 1. Capture 3 articles → Relationships auto-discovered
 2. Disconnect WiFi → Everything still works
-3. Right-click any image → Visual extraction
-4. Ask question → Answered from your captures
+3. Ask question → Answered from your captures
 
 ## Where This Could Go
 

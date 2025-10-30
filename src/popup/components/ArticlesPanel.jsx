@@ -46,7 +46,7 @@ function ArticlesPanel({ selectedNode }) {
   };
 
   const handleDeleteArticle = async (articleId) => {
-    if (!confirm('Delete this article? This will also remove any orphaned entities.')) {
+    if (!confirm('Delete this artifact? This will also remove any orphaned entities.')) {
       return;
     }
 
@@ -55,7 +55,7 @@ function ArticlesPanel({ selectedNode }) {
         type: 'DELETE_ARTICLE',
         articleId: articleId
       });
-      // Articles will reload automatically via message listener
+      // Artifacts will reload automatically via message listener
     } catch (error) {
       console.error('Failed to delete article:', error);
     }

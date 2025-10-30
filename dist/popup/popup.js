@@ -7449,9 +7449,7 @@ function defaultConstrain(transform, extent, translateExtent) {
 
 
 ;// ./src/utils/constants.js
-// Application constants and configuration
-
-// Entity types
+// Entity types for knowledge graph nodes
 const ENTITY_TYPES = {
   PERSON: 'person',
   COMPANY: 'company',
@@ -7459,7 +7457,7 @@ const ENTITY_TYPES = {
   CONCEPT: 'concept'
 };
 
-// Relationship types
+// Relationship types for graph connections
 const RELATIONSHIP_TYPES = {
   DIRECT: 'direct',
   CONCEPTUAL: 'conceptual',
@@ -7467,23 +7465,19 @@ const RELATIONSHIP_TYPES = {
   CAUSAL: 'causal'
 };
 
-// AI API configuration
+// Chrome AI API configuration
 const AI_CONFIG = {
   MAX_ARTICLE_CHARS: 6000,
-  // Reduced for faster processing
   MAX_ENTITIES_PER_ARTICLE: 8,
-  // Reduced for faster processing
   MAX_RELATIONSHIP_CANDIDATES: 8,
-  // Reduced for faster processing
   ENTITY_EXTRACTION_TEMPERATURE: 0.3,
   RELATIONSHIP_INFERENCE_TEMPERATURE: 0.3,
   SUMMARIZER_LENGTH: 'short',
-  // Changed to 'short' for faster processing
   SUMMARIZER_TYPE: 'key-points',
   SUMMARIZER_FORMAT: 'markdown'
 };
 
-// Graph visualization configuration
+// Graph visualization settings
 const GRAPH_CONFIG = {
   CANVAS_THRESHOLD: 200,
   FORCE_STRENGTH: -30,
@@ -7494,7 +7488,7 @@ const GRAPH_CONFIG = {
   LINK_WIDTH: 1.5
 };
 
-// UI configuration
+// UI layout configuration
 const UI_CONFIG = {
   POPUP_WIDTH: 800,
   POPUP_HEIGHT: 600,
@@ -7502,10 +7496,10 @@ const UI_CONFIG = {
   RECENT_ARTICLES_LIMIT: 10
 };
 
-// Default user topics
+// Default user interests
 const DEFAULT_TOPICS = ['AI', 'Technology', 'Science', 'Business', 'Innovation'];
 
-// Storage keys
+// Storage configuration
 const STORAGE_KEYS = {
   USER_SETTINGS: 'user_settings'
 };
@@ -7685,7 +7679,7 @@ function InsightPanel({
       className: "insight-panel"
     }, /*#__PURE__*/react.createElement("div", {
       className: "panel-placeholder"
-    }, /*#__PURE__*/react.createElement("h3", null, "No insights yet"), /*#__PURE__*/react.createElement("p", null, "Capture articles to see AI-generated insights")));
+    }, /*#__PURE__*/react.createElement("h3", null, "No insights yet"), /*#__PURE__*/react.createElement("p", null, "Capture articles to see insights about your reading patterns")));
   }
   return /*#__PURE__*/react.createElement("div", {
     className: "insight-panel"
@@ -7695,7 +7689,7 @@ function InsightPanel({
     className: "insight-card"
   }, /*#__PURE__*/react.createElement("h3", null, "Knowledge Summary"), /*#__PURE__*/react.createElement("p", null, "You have ", graphData.nodes.length, " entities in your graph"), /*#__PURE__*/react.createElement("p", null, graphData.links.length, " connections discovered")), /*#__PURE__*/react.createElement("div", {
     className: "insight-card"
-  }, /*#__PURE__*/react.createElement("h3", null, "Coming Soon"), /*#__PURE__*/react.createElement("p", null, "AI-generated insights about your knowledge patterns"), /*#__PURE__*/react.createElement("ul", null, /*#__PURE__*/react.createElement("li", null, "Topic trends over time"), /*#__PURE__*/react.createElement("li", null, "Unexpected connections"), /*#__PURE__*/react.createElement("li", null, "Knowledge gaps")))));
+  }, /*#__PURE__*/react.createElement("h3", null, "Coming Soon"), /*#__PURE__*/react.createElement("p", null, "Insights about your knowledge patterns"), /*#__PURE__*/react.createElement("ul", null, /*#__PURE__*/react.createElement("li", null, "Topic trends over time"), /*#__PURE__*/react.createElement("li", null, "Unexpected connections"), /*#__PURE__*/react.createElement("li", null, "Knowledge gaps")))));
 }
 /* harmony default export */ const components_InsightPanel = (InsightPanel);
 ;// ./src/popup/components/ArticlesPanel.jsx
@@ -7730,17 +7724,17 @@ function ArticlesPanel({
         const sortedArticles = response.articles.sort((a, b) => b.capturedAt - a.capturedAt);
         setArticles(sortedArticles);
       } else {
-        setError('Failed to load articles');
+        setError('Failed to load artifacts');
       }
     } catch (error) {
       console.error('Failed to load articles:', error);
-      setError('Failed to load articles');
+      setError('Failed to load artifacts');
     } finally {
       setLoading(false);
     }
   };
   const handleDeleteArticle = async articleId => {
-    if (!confirm('Delete this article? This will also remove any orphaned entities.')) {
+    if (!confirm('Delete this artifact? This will also remove any orphaned entities.')) {
       return;
     }
     try {
@@ -7748,7 +7742,7 @@ function ArticlesPanel({
         type: 'DELETE_ARTICLE',
         articleId: articleId
       });
-      // Articles will reload automatically via message listener
+      // Artifacts will reload automatically via message listener
     } catch (error) {
       console.error('Failed to delete article:', error);
     }
@@ -7804,12 +7798,12 @@ function ArticlesPanel({
     className: "articles-panel"
   }, /*#__PURE__*/react.createElement("div", {
     className: "articles-header"
-  }, /*#__PURE__*/react.createElement("h2", null, "Articles (", articles.length, ")", selectedNode && highlightedCount > 0 && /*#__PURE__*/react.createElement("span", {
+  }, /*#__PURE__*/react.createElement("h2", null, "Artifacts (", articles.length, ")", selectedNode && highlightedCount > 0 && /*#__PURE__*/react.createElement("span", {
     className: "entity-filter-indicator"
   }, "\xB7 ", highlightedCount, " contain \"", selectedNode.name, "\"")), /*#__PURE__*/react.createElement("button", {
     onClick: loadArticles,
     className: "refresh-button",
-    title: "Refresh articles"
+    title: "Refresh artifacts"
   }, "\u21BB")), /*#__PURE__*/react.createElement("div", {
     className: "articles-list"
   }, articles.map(article => {
@@ -8891,12 +8885,12 @@ function App() {
     isProcessing: isProcessing
   })), statistics && /*#__PURE__*/react.createElement("div", {
     className: "stats-bar"
-  }, /*#__PURE__*/react.createElement("span", null, statistics.totalEntities, " entities"), /*#__PURE__*/react.createElement("span", null, statistics.totalRelationships, " connections"), /*#__PURE__*/react.createElement("span", null, statistics.totalArticles, " articles"))), /*#__PURE__*/react.createElement("nav", {
+  }, /*#__PURE__*/react.createElement("span", null, statistics.totalEntities, " entities"), /*#__PURE__*/react.createElement("span", null, statistics.totalRelationships, " connections"), /*#__PURE__*/react.createElement("span", null, statistics.totalArticles, " artifacts"))), /*#__PURE__*/react.createElement("nav", {
     className: "app-nav"
   }, /*#__PURE__*/react.createElement("button", {
     className: `nav-button ${view === 'articles' ? 'active' : ''}`,
     onClick: () => setView('articles')
-  }, "Articles"), /*#__PURE__*/react.createElement("button", {
+  }, "Artifacts"), /*#__PURE__*/react.createElement("button", {
     className: `nav-button ${view === 'graph' ? 'active' : ''}`,
     onClick: () => setView('graph')
   }, "Graph"), /*#__PURE__*/react.createElement("button", {

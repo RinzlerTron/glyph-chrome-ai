@@ -176,21 +176,10 @@ function GraphPage() {
     setSelectedNode(entity);
   }
 
-  async function handleLoadDemo() {
-    try {
-      // Load demo data
-      await chrome.runtime.sendMessage({ type: 'LOAD_MOCK_DATA', entityCount: 50 });
-      // Reload graph
-      await loadGraphData();
-      setShowWelcome(false);
-    } catch (error) {
-      console.error('Failed to load demo:', error);
-      throw error;
-    }
-  }
 
   function handleStartFresh() {
     setShowWelcome(false);
+    setActiveTab('settings');
   }
 
   function handleTimelineArticleSelect(article) {
@@ -232,7 +221,7 @@ function GraphPage() {
 
   // Show welcome screen on first run
   if (showWelcome && stats.articles === 0) {
-    return <WelcomeScreen onStartFresh={handleStartFresh} onLoadDemo={handleLoadDemo} />;
+    return <WelcomeScreen onStartFresh={handleStartFresh} />;
   }
 
   if (graphData.nodes.length === 0 && activeTab === 'graph') {
@@ -404,7 +393,7 @@ function GraphPage() {
         {activeTab === 'insights' && (
           <div className="insights-container">
             <InsightPanel
-              graphData={graphData}
+              graphData={fullGraphData}
               stats={stats}
               onEntityClick={(entity) => {
                 setActiveTab('graph');
