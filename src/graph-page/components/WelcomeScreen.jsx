@@ -1,19 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 
-function WelcomeScreen({ onStartFresh, onLoadDemo }) {
-  const [loading, setLoading] = useState(false);
-
-  async function handleLoadDemo() {
-    setLoading(true);
-    try {
-      await onLoadDemo();
-    } catch (error) {
-      console.error('Failed to load demo:', error);
-      alert('Failed to load demo data. Please try again.');
-      setLoading(false);
-    }
-  }
+function WelcomeScreen({ onStartFresh }) {
 
   return (
     <div className="welcome-screen">
@@ -95,18 +83,10 @@ function WelcomeScreen({ onStartFresh, onLoadDemo }) {
 
         <div className="welcome-actions">
           <button
-            className="btn-primary btn-demo"
-            onClick={handleLoadDemo}
-            disabled={loading}
-          >
-            {loading ? 'Loading Demo...' : '🎯 Try Demo Data'}
-          </button>
-          <button
-            className="btn-secondary"
+            className="btn-primary"
             onClick={onStartFresh}
-            disabled={loading}
           >
-            Start Fresh
+            ⚙️ Settings
           </button>
         </div>
 
@@ -331,8 +311,7 @@ function WelcomeScreen({ onStartFresh, onLoadDemo }) {
 }
 
 WelcomeScreen.propTypes = {
-  onStartFresh: PropTypes.func.isRequired,
-  onLoadDemo: PropTypes.func.isRequired
+  onStartFresh: PropTypes.func.isRequired
 };
 
 export default WelcomeScreen;

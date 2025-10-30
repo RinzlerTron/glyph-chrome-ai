@@ -83,7 +83,7 @@ function ArticlesList({ onClose, onArticleClick, selectedArticle, onHighlightEnt
         setUserTopics(topics);
 
         // Compute clusters and connections with topic awareness
-        const clusteredData = clusterArticles(articlesList, 2, entityMap, topics);
+        const clusteredData = clusterArticles(articlesList, 1, entityMap, topics);
         setClusters(clusteredData);
 
         // Expand all clusters by default
@@ -290,7 +290,7 @@ function ArticlesList({ onClose, onArticleClick, selectedArticle, onHighlightEnt
               <button
                 className="article-delete"
                 onClick={(e) => handleDeleteArticle(article.id, e)}
-                title="Delete article"
+                title="Delete artifact"
               >
                 Delete
               </button>
@@ -410,7 +410,7 @@ function ArticlesList({ onClose, onArticleClick, selectedArticle, onHighlightEnt
 
       <div className="articles-body">
         {articles.length === 0 ? (
-          <p className="no-articles">No articles yet</p>
+          <p className="no-articles">No artifacts yet</p>
         ) : (
           <>
             {viewMode === 'recent' ? renderRecentView() : renderConnectedView()}

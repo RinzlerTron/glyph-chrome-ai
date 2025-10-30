@@ -39,7 +39,10 @@ async function handleCapture() {
   } catch (error) {
     console.error('Capture failed:', error);
     showNotification(`Error: ${error.message}`, 'error');
-    throw error;
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 function extractArticleText() {

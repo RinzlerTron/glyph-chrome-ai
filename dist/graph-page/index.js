@@ -9114,9 +9114,7 @@ function defaultConstrain(transform, extent, translateExtent) {
 
 
 ;// ./src/utils/constants.js
-// Application constants and configuration
-
-// Entity types
+// Entity types for knowledge graph nodes
 const ENTITY_TYPES = {
   PERSON: 'person',
   COMPANY: 'company',
@@ -9124,7 +9122,7 @@ const ENTITY_TYPES = {
   CONCEPT: 'concept'
 };
 
-// Relationship types
+// Relationship types for graph connections
 const RELATIONSHIP_TYPES = {
   DIRECT: 'direct',
   CONCEPTUAL: 'conceptual',
@@ -9132,23 +9130,19 @@ const RELATIONSHIP_TYPES = {
   CAUSAL: 'causal'
 };
 
-// AI API configuration
+// Chrome AI API configuration
 const AI_CONFIG = {
   MAX_ARTICLE_CHARS: 6000,
-  // Reduced for faster processing
   MAX_ENTITIES_PER_ARTICLE: 8,
-  // Reduced for faster processing
   MAX_RELATIONSHIP_CANDIDATES: 8,
-  // Reduced for faster processing
   ENTITY_EXTRACTION_TEMPERATURE: 0.3,
   RELATIONSHIP_INFERENCE_TEMPERATURE: 0.3,
   SUMMARIZER_LENGTH: 'short',
-  // Changed to 'short' for faster processing
   SUMMARIZER_TYPE: 'key-points',
   SUMMARIZER_FORMAT: 'markdown'
 };
 
-// Graph visualization configuration
+// Graph visualization settings
 const GRAPH_CONFIG = {
   CANVAS_THRESHOLD: 200,
   FORCE_STRENGTH: -30,
@@ -9159,7 +9153,7 @@ const GRAPH_CONFIG = {
   LINK_WIDTH: 1.5
 };
 
-// UI configuration
+// UI layout configuration
 const UI_CONFIG = {
   POPUP_WIDTH: 800,
   POPUP_HEIGHT: 600,
@@ -9167,10 +9161,10 @@ const UI_CONFIG = {
   RECENT_ARTICLES_LIMIT: 10
 };
 
-// Default user topics
+// Default user interests
 const DEFAULT_TOPICS = ['AI', 'Technology', 'Science', 'Business', 'Innovation'];
 
-// Storage keys
+// Storage configuration
 const STORAGE_KEYS = {
   USER_SETTINGS: 'user_settings'
 };
@@ -9356,11 +9350,12 @@ function KnowledgeGraph({
     // Add circles to nodes
     node.append('circle').attr('r', d => {
       const baseSize = GRAPH_CONFIG.DEFAULT_NODE_SIZE;
-      const degreeBonus = Math.sqrt(d.degree || 0) * 2;
+      // Enhanced degree bonus - more dramatic size differences
+      const degreeBonus = Math.sqrt(d.degree || 0) * 3;
       const highlightBonus = isHighlighted(d) ? 3 : 0;
       // Primary nodes (from selected article) are larger
       const primaryBonus = d.isFromSelectedArticle ? 4 : 0;
-      return baseSize + degreeBonus + highlightBonus + primaryBonus;
+      return Math.min(baseSize + degreeBonus + highlightBonus + primaryBonus, 24); // Cap max size
     }).attr('fill', d => colorScale[d.type] || '#6b7280').attr('stroke', d => {
       if (selectedNode && selectedNode.id === d.id) return '#ffffff';
       if (isHighlighted(d)) return '#fbbf24';
@@ -9377,7 +9372,31 @@ function KnowledgeGraph({
       if (isDimmed(d)) return 0.3;
       // Secondary nodes (connected) are more subtle
       return d.isFromSelectedArticle ? 1 : 0.7;
-    }).style('cursor', 'pointer').style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
+    }).style('cursor', 'pointer').style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))').on('mouseenter', function (event, d) {
+      // Highlight connected nodes and edges on hover
+      const connectedNodeIds = new Set();
+
+      // Find all connected nodes
+      links.forEach(link => {
+        if (link.source.id === d.id) connectedNodeIds.add(link.target.id);
+        if (link.target.id === d.id) connectedNodeIds.add(link.source.id);
+      });
+
+      // Dim non-connected nodes
+      node.selectAll('circle').style('opacity', nodeData => {
+        if (nodeData.id === d.id) return 1; // Keep current node bright
+        return connectedNodeIds.has(nodeData.id) ? 0.8 : 0.3;
+      });
+
+      // Highlight connected edges
+      link.style('opacity', linkData => {
+        return linkData.source.id === d.id || linkData.target.id === d.id ? 1 : 0.1;
+      });
+    }).on('mouseleave', function () {
+      // Reset all opacities
+      node.selectAll('circle').style('opacity', d => isDimmed(d) ? 0.3 : d.isFromSelectedArticle ? 1 : 0.7);
+      link.style('opacity', 0.6);
+    });
 
     // Add labels to nodes
     node.append('text').text(d => d.name).attr('x', 12).attr('y', 4).attr('font-size', d => isHighlighted(d) ? '13px' : '12px').attr('font-family', 'system-ui, -apple-system, sans-serif').attr('font-weight', d => isHighlighted(d) ? '600' : '500').attr('fill', d => isDimmed(d) ? '#666' : '#e0e0e0').style('pointer-events', 'none').style('user-select', 'none');
@@ -9433,11 +9452,6 @@ function KnowledgeGraph({
       if (onNodeClick) {
         onNodeClick(d);
       }
-    });
-
-    // Add title tooltips
-    node.append('title').text(d => {
-      return `${d.name}\nType: ${d.type}\nTopic: ${d.topic}\nConnections: ${d.degree || 0}`;
     });
 
     // Update positions on each tick
@@ -9702,12 +9716,27 @@ function InsightPanel({
   const [synthesizing, setSynthesizing] = (0,react.useState)(false);
   const [syntheses, setSyntheses] = (0,react.useState)([]);
   const [selectedSynthesis, setSelectedSynthesis] = (0,react.useState)(null);
+
+  // Weekly timeline states
+  const [showWeekPicker, setShowWeekPicker] = (0,react.useState)(false);
+  const [selectedWeekDate, setSelectedWeekDate] = (0,react.useState)(new Date());
+  const [weeklySyntheses, setWeeklySyntheses] = (0,react.useState)(new Map());
   (0,react.useEffect)(() => {
     loadSyntheses();
     const messageListener = message => {
       if (message.type === 'SYNTHESIS_COMPLETE') {
+        console.log('Synthesis complete message received, reloading syntheses...');
+
+        // Clear any cached synthesis state first
+        setWeeklySyntheses(new Map());
+
+        // Reload syntheses from service worker
         loadSyntheses();
         setSynthesizing(false);
+
+        // Ensure we're viewing the current week to see the results
+        setSelectedWeekDate(new Date());
+        console.log('Switched to current week view to show new synthesis');
 
         // Show brief success notification
         const notification = document.createElement('div');
@@ -9734,41 +9763,49 @@ function InsightPanel({
       }
     };
     chrome.runtime.onMessage.addListener(messageListener);
+
+    // Click outside to close week picker
+    const handleClickOutside = event => {
+      if (showWeekPicker && !event.target.closest('.week-picker-container')) {
+        setShowWeekPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [showWeekPicker]);
   async function loadSyntheses() {
     try {
       const result = await chrome.runtime.sendMessage({
         type: 'GET_ALL_SYNTHESES'
       });
       if (result.success) {
+        console.log('Raw syntheses from service worker:', result.syntheses);
         setSyntheses(result.syntheses || []);
         if (result.syntheses.length > 0 && !selectedSynthesis) {
           setSelectedSynthesis(result.syntheses[0]);
         }
+
+        // Also populate weeklySyntheses Map for the weekly synthesis display
+        const weeklyMap = new Map();
+        (result.syntheses || []).forEach(synthesis => {
+          if (synthesis.weekStart) {
+            const weekStart = new Date(synthesis.weekStart);
+            const weekKey = formatWeekRange(weekStart);
+            console.log('Storing synthesis with key:', weekKey, 'from weekStart:', synthesis.weekStart);
+            console.log('weekStart as Date:', new Date(synthesis.weekStart));
+            console.log('Calculated weekStart:', weekStart);
+            console.log('Calculated weekEnd:', getWeekEnd(weekStart));
+            weeklyMap.set(weekKey, synthesis);
+          }
+        });
+        setWeeklySyntheses(weeklyMap);
+        console.log('Loaded weekly syntheses:', Array.from(weeklyMap.keys()));
       }
     } catch (error) {
       console.error('Failed to load syntheses:', error);
-    }
-  }
-  async function handleSynthesizeWeek() {
-    if (synthesizing) return;
-    setSynthesizing(true);
-    try {
-      const result = await chrome.runtime.sendMessage({
-        type: 'SYNTHESIZE_WEEK'
-      });
-      if (!result.success) {
-        alert('Synthesis failed: ' + (result.error || 'Unknown error'));
-        setSynthesizing(false);
-      }
-      // On success, keep synthesizing=true until SYNTHESIS_COMPLETE message arrives
-    } catch (error) {
-      console.error('Synthesis failed:', error);
-      alert('Synthesis failed. Writer API may not be available.');
-      setSynthesizing(false);
     }
   }
   async function handleManualDiscovery() {
@@ -9791,12 +9828,163 @@ function InsightPanel({
       setDiscovering(false);
     }
   }
+
+  // Calendar Week Picker Functions
+  function getWeekStart(date) {
+    // Create a fresh date object to avoid mutations
+    const d = new Date(date.getTime());
+    const day = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    // Go back 'day' number of days to reach Sunday
+    d.setDate(d.getDate() - day);
+    // Reset time to start of day for consistency
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  function getWeekEnd(weekStart) {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    return weekEnd;
+  }
+  function getSelectedWeekRange() {
+    const weekStart = getWeekStart(selectedWeekDate);
+    console.log('getSelectedWeekRange - selectedWeekDate:', selectedWeekDate);
+    console.log('getSelectedWeekRange - calculated weekStart:', weekStart);
+    const range = formatWeekRange(weekStart);
+    console.log('getSelectedWeekRange - final range:', range);
+    return range;
+  }
+  function getWeekInputValue() {
+    const weekStart = getWeekStart(selectedWeekDate);
+    const year = weekStart.getFullYear();
+    const weekNumber = getWeekNumber(weekStart);
+    return `${year}-W${weekNumber.toString().padStart(2, '0')}`;
+  }
+  function getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  }
+  function getPastWeekOptions() {
+    const weeks = [];
+    const today = new Date();
+    const currentWeekStart = getWeekStart(today);
+
+    // Generate last 4 weeks
+    for (let i = 0; i < 4; i++) {
+      const weekDate = new Date(currentWeekStart);
+      weekDate.setDate(weekDate.getDate() - i * 7);
+      const weekStart = getWeekStart(weekDate);
+      const weekRange = formatWeekRange(weekStart);
+      const isSelected = weekStart.getTime() === getWeekStart(selectedWeekDate).getTime();
+      const isCurrent = i === 0;
+      const hasSynthesis = weeklySyntheses.has(weekRange);
+      weeks.push({
+        date: weekDate,
+        label: isCurrent ? `This Week (${weekRange})` : weekRange,
+        isSelected,
+        isCurrent,
+        hasSynthesis
+      });
+    }
+    return weeks;
+  }
+  function handleCustomWeekSelect(week) {
+    setSelectedWeekDate(week.date);
+    setShowWeekPicker(false);
+  }
+  function formatWeekRange(weekStart) {
+    const weekEnd = getWeekEnd(weekStart);
+    const startMonth = weekStart.toLocaleDateString('en-US', {
+      month: 'short'
+    });
+    const endMonth = weekEnd.toLocaleDateString('en-US', {
+      month: 'short'
+    });
+    const year = weekStart.getFullYear();
+    if (startMonth === endMonth) {
+      return `${startMonth} ${weekStart.getDate()} – ${weekEnd.getDate()}, ${year}`;
+    } else {
+      return `${startMonth} ${weekStart.getDate()} – ${endMonth} ${weekEnd.getDate()}, ${year}`;
+    }
+  }
+  function isCurrentWeek() {
+    const now = new Date();
+    const selected = selectedWeekDate || now;
+
+    // Get week start for both dates
+    const currentWeekStart = getWeekStart(new Date(now));
+    const selectedWeekStart = getWeekStart(new Date(selected));
+
+    // Compare just the dates (year, month, day) to avoid time zone issues
+    const currentStr = currentWeekStart.toDateString();
+    const selectedStr = selectedWeekStart.toDateString();
+    return currentStr === selectedStr;
+  }
+  function hasWeeklyActivity() {
+    // Only allow generation for current week
+    return isCurrentWeek();
+  }
+  function getWeeklySynthesis() {
+    // If we're viewing the current week, get the most recent synthesis
+    if (isCurrentWeek()) {
+      const availableKeys = Array.from(weeklySyntheses.keys());
+      console.log('Looking for current week synthesis in:', availableKeys);
+
+      // Return the most recent synthesis (last in the map)
+      if (availableKeys.length > 0) {
+        const mostRecentKey = availableKeys[availableKeys.length - 1];
+        console.log('Using most recent synthesis key:', mostRecentKey);
+        return weeklySyntheses.get(mostRecentKey);
+      }
+    }
+
+    // For non-current weeks, use exact key matching
+    const weekKey = getSelectedWeekRange();
+    console.log('Getting synthesis for key:', weekKey);
+    console.log('Available syntheses:', Array.from(weeklySyntheses.keys()));
+    const synthesis = weeklySyntheses.get(weekKey);
+    console.log('Found synthesis:', synthesis);
+    return synthesis;
+  }
+  async function handleSynthesizeWeek() {
+    if (synthesizing) return;
+    setSynthesizing(true);
+    try {
+      // Always synthesize for the current week
+      const now = new Date();
+      const weekStart = getWeekStart(now);
+      console.log('Requesting synthesis for weekStart:', weekStart);
+      console.log('Current selected week key will be:', formatWeekRange(weekStart));
+      const result = await chrome.runtime.sendMessage({
+        type: 'SYNTHESIZE_WEEK',
+        weekStart: weekStart,
+        force: true,
+        // Always force new synthesis, even if one exists
+        timestamp: Date.now() // Add timestamp to ensure fresh request
+      });
+      console.log('Sent synthesis request with force=true and timestamp:', Date.now());
+      if (result.success) {
+        console.log('Synthesis request successful, waiting for completion message...');
+        // Keep synthesizing=true until SYNTHESIS_COMPLETE message arrives
+        // Don't reset it here - let the message listener handle it
+      } else {
+        alert('Synthesis failed: ' + (result.error || 'Unknown error'));
+        setSynthesizing(false);
+      }
+    } catch (error) {
+      console.error('Weekly synthesis failed:', error);
+      alert('Synthesis failed. Writer API may not be available.');
+      setSynthesizing(false);
+    }
+  }
   if (!graphData || graphData.nodes.length === 0) {
     return /*#__PURE__*/react.createElement("div", {
       className: "insight-panel"
     }, /*#__PURE__*/react.createElement("div", {
       className: "panel-placeholder"
-    }, /*#__PURE__*/react.createElement("h3", null, "No insights yet"), /*#__PURE__*/react.createElement("p", null, "Capture articles to see AI-generated insights")));
+    }, /*#__PURE__*/react.createElement("h3", null, "No insights yet"), /*#__PURE__*/react.createElement("p", null, "Capture articles to see insights about your reading patterns")));
   }
   const entityTypes = graphData.nodes.reduce((acc, node) => {
     acc[node.type] = (acc[node.type] || 0) + 1;
@@ -9822,39 +10010,91 @@ function InsightPanel({
   const avgConnections = graphData.nodes.length > 0 ? (graphData.links.length * 2 / graphData.nodes.length).toFixed(1) : 0;
   return /*#__PURE__*/react.createElement("div", {
     className: "insight-panel"
-  }, /*#__PURE__*/react.createElement("h2", null, "Insights"), /*#__PURE__*/react.createElement("div", {
+  }, /*#__PURE__*/react.createElement("div", {
     className: "insights-list"
   }, /*#__PURE__*/react.createElement("div", {
-    className: "insight-card"
-  }, /*#__PURE__*/react.createElement("h3", null, "Knowledge Overview"), /*#__PURE__*/react.createElement("div", {
-    className: "stats-grid"
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr 1fr',
+      gap: '24px',
+      marginBottom: '20px'
+    }
   }, /*#__PURE__*/react.createElement("div", {
-    className: "stat-item"
-  }, /*#__PURE__*/react.createElement("div", {
-    className: "stat-number"
-  }, graphData.nodes.length), /*#__PURE__*/react.createElement("div", {
-    className: "stat-label"
-  }, "Total Entities")), /*#__PURE__*/react.createElement("div", {
-    className: "stat-item"
-  }, /*#__PURE__*/react.createElement("div", {
-    className: "stat-number"
-  }, graphData.links.length), /*#__PURE__*/react.createElement("div", {
-    className: "stat-label"
-  }, "Connections")), /*#__PURE__*/react.createElement("div", {
-    className: "stat-item"
-  }, /*#__PURE__*/react.createElement("div", {
-    className: "stat-number"
-  }, avgConnections), /*#__PURE__*/react.createElement("div", {
-    className: "stat-label"
-  }, "Avg Connections/Entity")))), /*#__PURE__*/react.createElement("div", {
     className: "insight-card"
   }, /*#__PURE__*/react.createElement("h3", null, "Entity Distribution"), /*#__PURE__*/react.createElement("p", {
     style: {
       fontSize: '13px',
       color: '#888',
-      marginBottom: '15px'
+      marginBottom: '16px'
     }
   }, "Breakdown of your knowledge graph by entity type"), /*#__PURE__*/react.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr 1fr',
+      gap: '8px',
+      marginBottom: '20px'
+    }
+  }, /*#__PURE__*/react.createElement("div", {
+    style: {
+      padding: '12px',
+      background: 'rgba(167, 139, 250, 0.1)',
+      border: '1px solid rgba(167, 139, 250, 0.3)',
+      borderRadius: '6px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontSize: '18px',
+      fontWeight: 'bold',
+      color: '#a78bfa',
+      marginBottom: '2px'
+    }
+  }, graphData.nodes.length), /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontSize: '10px',
+      color: '#888'
+    }
+  }, "Entities")), /*#__PURE__*/react.createElement("div", {
+    style: {
+      padding: '12px',
+      background: 'rgba(96, 165, 250, 0.1)',
+      border: '1px solid rgba(96, 165, 250, 0.3)',
+      borderRadius: '6px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontSize: '18px',
+      fontWeight: 'bold',
+      color: '#60a5fa',
+      marginBottom: '2px'
+    }
+  }, graphData.links.length), /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontSize: '10px',
+      color: '#888'
+    }
+  }, "Connections")), /*#__PURE__*/react.createElement("div", {
+    style: {
+      padding: '12px',
+      background: 'rgba(52, 211, 153, 0.1)',
+      border: '1px solid rgba(52, 211, 153, 0.3)',
+      borderRadius: '6px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontSize: '18px',
+      fontWeight: 'bold',
+      color: '#34d399',
+      marginBottom: '2px'
+    }
+  }, avgConnections), /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontSize: '10px',
+      color: '#888'
+    }
+  }, "Avg/Entity"))), /*#__PURE__*/react.createElement("div", {
     className: "entity-types"
   }, entityTypeBreakdown.map(({
     type,
@@ -9878,6 +10118,170 @@ function InsightPanel({
       background: type === 'person' ? '#60a5fa' : type === 'company' ? '#a78bfa' : type === 'technology' ? '#34d399' : '#fbbf24'
     }
   })))))), /*#__PURE__*/react.createElement("div", {
+    className: "insight-card",
+    style: {
+      minHeight: '400px',
+      display: 'flex',
+      flexDirection: 'column'
+    }
+  }, /*#__PURE__*/react.createElement("h3", null, "Weekly Learning Synthesis"), /*#__PURE__*/react.createElement("p", {
+    style: {
+      fontSize: '14px',
+      color: '#888',
+      lineHeight: '1.6',
+      marginBottom: '12px'
+    }
+  }, "Your week in review"), /*#__PURE__*/react.createElement("div", {
+    className: "week-picker-container",
+    style: {
+      marginBottom: '16px'
+    }
+  }, /*#__PURE__*/react.createElement("div", {
+    onClick: () => setShowWeekPicker(!showWeekPicker),
+    style: {
+      padding: '8px 12px',
+      background: 'rgba(30, 64, 175, 0.1)',
+      border: '1px solid rgba(30, 64, 175, 0.2)',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontSize: '14px',
+      fontWeight: '600',
+      color: '#60a5fa'
+    }
+  }, getSelectedWeekRange())), showWeekPicker && /*#__PURE__*/react.createElement("div", {
+    style: {
+      position: 'absolute',
+      zIndex: 1000,
+      marginTop: '4px',
+      background: 'rgba(30, 30, 45, 0.98)',
+      border: '1px solid rgba(108, 92, 231, 0.4)',
+      borderRadius: '12px',
+      padding: '8px',
+      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+      minWidth: '220px',
+      backdropFilter: 'blur(10px)'
+    }
+  }, /*#__PURE__*/react.createElement("div", {
+    style: {
+      marginBottom: '12px',
+      fontSize: '13px',
+      color: '#a78bfa',
+      fontWeight: '600'
+    }
+  }, "Select Week"), getPastWeekOptions().map((week, index) => /*#__PURE__*/react.createElement("div", {
+    key: index,
+    onClick: () => handleCustomWeekSelect(week),
+    style: {
+      padding: '12px 16px',
+      background: week.isSelected ? 'rgba(108, 92, 231, 0.4)' : week.isCurrent ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
+      border: 'none',
+      borderRadius: '8px',
+      marginBottom: '6px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: week.isCurrent ? '600' : '500',
+      color: week.isSelected ? '#a78bfa' : week.isCurrent ? '#60a5fa' : '#d1d5db',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    onMouseEnter: e => {
+      if (!week.isSelected && !week.isCurrent) {
+        e.target.style.background = 'rgba(108, 92, 231, 0.15)';
+      }
+    },
+    onMouseLeave: e => {
+      if (!week.isSelected && !week.isCurrent) {
+        e.target.style.background = 'transparent';
+      }
+    }
+  }, /*#__PURE__*/react.createElement("span", null, week.label), week.hasSynthesis && /*#__PURE__*/react.createElement("span", {
+    style: {
+      color: '#10b981',
+      fontSize: '16px'
+    }
+  }, "\u2713"))))), isCurrentWeek() ? /*#__PURE__*/react.createElement("button", {
+    onClick: () => handleSynthesizeWeek(),
+    disabled: synthesizing,
+    style: {
+      padding: '8px 16px',
+      background: synthesizing ? '#475569' : '#6C5CE7',
+      border: 'none',
+      borderRadius: '12px',
+      color: 'white',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: synthesizing ? 'not-allowed' : 'pointer',
+      width: '100%',
+      marginBottom: '12px',
+      height: '40px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, synthesizing ? 'Generating synthesis...' : 'Synthesize Learning for this Week') : /*#__PURE__*/react.createElement("div", {
+    style: {
+      padding: '8px 12px',
+      background: 'rgba(96, 165, 250, 0.1)',
+      border: '1px solid rgba(96, 165, 250, 0.2)',
+      borderRadius: '8px',
+      color: '#60a5fa',
+      fontSize: '12px',
+      textAlign: 'center',
+      marginBottom: '12px',
+      height: '40px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, "\uD83D\uDCC5 Past week synthesis would appear here"), /*#__PURE__*/react.createElement("button", {
+    onClick: handleManualDiscovery,
+    disabled: discovering || graphData.nodes.length < 2,
+    style: {
+      padding: '8px 16px',
+      background: discovering ? '#475569' : '#10b981',
+      border: 'none',
+      borderRadius: '12px',
+      color: 'white',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: discovering || graphData.nodes.length < 2 ? 'not-allowed' : 'pointer',
+      width: '100%',
+      height: '40px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, discovering ? 'Finding connections...' : 'Discover More Connections'), getWeeklySynthesis() && /*#__PURE__*/react.createElement("div", {
+    style: {
+      marginTop: '20px',
+      padding: '16px',
+      background: 'rgba(167, 139, 250, 0.1)',
+      border: '1px solid rgba(167, 139, 250, 0.3)',
+      borderRadius: '8px',
+      fontSize: '14px',
+      color: '#e0e0e0',
+      lineHeight: '1.6',
+      flex: 1
+    }
+  }, /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontWeight: '600',
+      marginBottom: '8px',
+      color: '#a78bfa'
+    }
+  }, "\uD83D\uDCDA ", getSelectedWeekRange()), /*#__PURE__*/react.createElement("div", {
+    style: {
+      fontSize: '12px',
+      color: '#888',
+      marginBottom: '12px'
+    }
+  }, getWeeklySynthesis()?.articlesAnalyzed || 0, " artifacts analyzed"), getWeeklySynthesis()?.synthesis || 'No synthesis available for this week.')), /*#__PURE__*/react.createElement("div", {
     className: "insight-card"
   }, /*#__PURE__*/react.createElement("h3", null, "Most Connected Entities"), topEntities.length > 0 ? /*#__PURE__*/react.createElement("div", {
     className: "top-entities"
@@ -9897,121 +10301,7 @@ function InsightPanel({
       color: '#888',
       fontSize: '14px'
     }
-  }, "No connections yet. Capture more articles to discover relationships!")), /*#__PURE__*/react.createElement("div", {
-    className: "insight-card"
-  }, /*#__PURE__*/react.createElement("h3", null, "Weekly Learning Synthesis"), /*#__PURE__*/react.createElement("p", {
-    style: {
-      fontSize: '14px',
-      color: '#888',
-      lineHeight: '1.6',
-      marginBottom: '12px'
-    }
-  }, "Generate an AI narrative summary of your learning journey this week"), /*#__PURE__*/react.createElement("button", {
-    onClick: handleSynthesizeWeek,
-    disabled: synthesizing || graphData.nodes.length < 5,
-    style: {
-      padding: '12px 24px',
-      background: synthesizing ? '#888' : 'linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%)',
-      border: 'none',
-      borderRadius: '8px',
-      color: 'white',
-      fontSize: '14px',
-      fontWeight: '600',
-      cursor: synthesizing || graphData.nodes.length < 5 ? 'not-allowed' : 'pointer',
-      width: '100%',
-      marginBottom: syntheses.length > 0 ? '16px' : '0'
-    }
-  }, synthesizing ? 'Synthesizing (background)...' : '✨ Synthesize My Week'), syntheses.length > 0 && /*#__PURE__*/react.createElement(react.Fragment, null, /*#__PURE__*/react.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: '8px',
-      marginTop: '16px',
-      marginBottom: '12px',
-      flexWrap: 'wrap'
-    }
-  }, syntheses.map((syn, idx) => {
-    const date = new Date(syn.createdAt);
-    const weekStart = new Date(syn.weekStart);
-    const label = idx === 0 ? 'Latest' : weekStart.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-    return /*#__PURE__*/react.createElement("button", {
-      key: syn.id,
-      onClick: () => setSelectedSynthesis(syn),
-      style: {
-        padding: '8px 12px',
-        background: selectedSynthesis?.id === syn.id ? 'rgba(167, 139, 250, 0.3)' : 'rgba(167, 139, 250, 0.1)',
-        border: `1px solid ${selectedSynthesis?.id === syn.id ? 'rgba(167, 139, 250, 0.5)' : 'rgba(167, 139, 250, 0.2)'}`,
-        borderRadius: '6px',
-        color: '#a78bfa',
-        fontSize: '12px',
-        fontWeight: '600',
-        cursor: 'pointer',
-        transition: 'all 0.2s'
-      }
-    }, label);
-  })), selectedSynthesis && /*#__PURE__*/react.createElement("div", {
-    style: {
-      padding: '16px',
-      background: 'rgba(167, 139, 250, 0.1)',
-      border: '1px solid rgba(167, 139, 250, 0.3)',
-      borderRadius: '8px',
-      fontSize: '14px',
-      color: '#e0e0e0',
-      lineHeight: '1.6',
-      maxHeight: '300px',
-      overflowY: 'auto'
-    }
-  }, /*#__PURE__*/react.createElement("div", {
-    style: {
-      fontWeight: '600',
-      marginBottom: '8px',
-      color: '#a78bfa'
-    }
-  }, "\uD83D\uDCDA Week of ", new Date(selectedSynthesis.weekStart).toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric'
-  })), /*#__PURE__*/react.createElement("div", {
-    style: {
-      fontSize: '12px',
-      color: '#888',
-      marginBottom: '12px'
-    }
-  }, selectedSynthesis.articlesAnalyzed, " articles analyzed"), selectedSynthesis.synthesis))), /*#__PURE__*/react.createElement("div", {
-    className: "insight-card"
-  }, /*#__PURE__*/react.createElement("h3", null, "Relationship Discovery"), /*#__PURE__*/react.createElement("p", {
-    style: {
-      fontSize: '14px',
-      color: '#888',
-      lineHeight: '1.6',
-      marginBottom: '12px'
-    }
-  }, "Glyph automatically discovers connections between entities using AI every 3 articles. You can also discover relationships manually anytime."), /*#__PURE__*/react.createElement("button", {
-    onClick: handleManualDiscovery,
-    disabled: discovering || graphData.nodes.length < 2,
-    style: {
-      padding: '12px 24px',
-      background: discovering ? '#888' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      border: 'none',
-      borderRadius: '8px',
-      color: 'white',
-      fontSize: '14px',
-      fontWeight: '600',
-      cursor: discovering || graphData.nodes.length < 2 ? 'not-allowed' : 'pointer',
-      width: '100%'
-    }
-  }, discovering ? 'Discovering...' : 'Discover Relationships Now'), /*#__PURE__*/react.createElement("div", {
-    style: {
-      marginTop: '12px',
-      padding: '10px',
-      background: 'rgba(102, 126, 234, 0.1)',
-      borderRadius: '6px',
-      fontSize: '12px',
-      color: '#a5b4fc'
-    }
-  }, "\u2713 Auto-discovery enabled (every 3 articles)"))));
+  }, "No connections yet. Capture more articles to discover relationships!")))));
 }
 /* harmony default export */ const components_InsightPanel = (InsightPanel);
 ;// ./src/graph-page/components/SettingsPanel.jsx
@@ -10184,14 +10474,27 @@ function ChatQuery({
   const [loading, setLoading] = (0,react.useState)(false);
   const [isOpen, setIsOpen] = (0,react.useState)(false);
   const [smartQuestions, setSmartQuestions] = (0,react.useState)([]);
+  const [aiQuestion, setAiQuestion] = (0,react.useState)('');
+  const [generatingAiQuestion, setGeneratingAiQuestion] = (0,react.useState)(false);
   (0,react.useEffect)(() => {
     if (selectedEntity && graphData) {
       generateSmartQuestions();
+      // Reset AI question when entity changes
+      setAiQuestion('');
+      setGeneratingAiQuestion(false);
     } else {
       setSmartQuestions([]);
       setAnswer('');
+      setAiQuestion('');
+      setGeneratingAiQuestion(false);
     }
   }, [selectedEntity, graphData]);
+  (0,react.useEffect)(() => {
+    // Generate AI question when panel opens
+    if (isOpen && selectedEntity && !aiQuestion && !generatingAiQuestion) {
+      generateAiQuestion();
+    }
+  }, [isOpen, selectedEntity, aiQuestion, generatingAiQuestion]);
   function generateSmartQuestions() {
     if (!selectedEntity) {
       setSmartQuestions([]);
@@ -10226,6 +10529,92 @@ function ChatQuery({
       });
     }
     setSmartQuestions(questions.slice(0, 3));
+  }
+  function handleSimpleGoogleSearch() {
+    const searchQuery = selectedEntity.name;
+    const encodedQuery = encodeURIComponent(searchQuery);
+    const googleUrl = `https://www.google.com/search?q=${encodedQuery}`;
+    chrome.tabs.create({
+      url: googleUrl
+    });
+  }
+  function handleContextualGoogleSearch() {
+    // Add 2-3 related entities for context
+    const relatedEntities = [];
+    const connections = graphData.links.filter(link => link.source === selectedEntity.id || link.target === selectedEntity.id);
+    connections.forEach(link => {
+      const relatedId = link.source === selectedEntity.id ? link.target : link.source;
+      const relatedEntity = graphData.nodes.find(node => node.id === relatedId);
+      if (relatedEntity && relatedEntity.type !== selectedEntity.type) {
+        relatedEntities.push(relatedEntity.name);
+      }
+    });
+    let searchQuery = selectedEntity.name;
+    if (relatedEntities.length > 0) {
+      searchQuery += ` ${relatedEntities.slice(0, 2).join(' ')}`;
+    }
+    const encodedQuery = encodeURIComponent(searchQuery);
+    const googleUrl = `https://www.google.com/search?q=${encodedQuery}`;
+    chrome.tabs.create({
+      url: googleUrl
+    });
+  }
+  function handleAiQuestionSearch() {
+    if (aiQuestion) {
+      const encodedQuery = encodeURIComponent(aiQuestion);
+      const googleUrl = `https://www.google.com/search?q=${encodedQuery}`;
+      chrome.tabs.create({
+        url: googleUrl
+      });
+    }
+  }
+  async function generateAiQuestion() {
+    if (!selectedEntity) return;
+    setGeneratingAiQuestion(true);
+    try {
+      // Get related entities for context
+      const relatedEntities = [];
+      const connections = graphData.links.filter(link => link.source === selectedEntity.id || link.target === selectedEntity.id);
+      connections.forEach(link => {
+        const relatedId = link.source === selectedEntity.id ? link.target : link.source;
+        const relatedEntity = graphData.nodes.find(node => node.id === relatedId);
+        if (relatedEntity) {
+          relatedEntities.push(`${relatedEntity.name} (${relatedEntity.type})`);
+        }
+      });
+      const contextInfo = relatedEntities.length > 0 ? ` It's connected to: ${relatedEntities.slice(0, 3).join(', ')}.` : '';
+      const prompt = `You are helping a user research "${selectedEntity.name}" (a ${selectedEntity.type}).${contextInfo}
+
+Generate ONE specific, searchable research question that would help them learn more. The question should be:
+- Focused and specific
+- Good for Google search
+- About recent developments, applications, or relationships
+- 8-15 words maximum
+
+Examples of good questions:
+- "How does CRISPR gene editing affect cancer treatment 2024"
+- "What are latest applications of machine learning in healthcare"
+
+Generate only the research question, no explanations:`;
+      const response = await chrome.runtime.sendMessage({
+        type: 'GENERATE_AI_QUESTION',
+        prompt: prompt
+      });
+      if (response.success && response.question) {
+        setAiQuestion(response.question.trim());
+      } else {
+        // Fallback if AI fails
+        const fallback = `What are recent developments in ${selectedEntity.name}`;
+        setAiQuestion(fallback);
+      }
+    } catch (error) {
+      console.error('AI question generation failed:', error);
+      // Fallback question
+      const fallback = `What are recent developments in ${selectedEntity.name}`;
+      setAiQuestion(fallback);
+    } finally {
+      setGeneratingAiQuestion(false);
+    }
   }
   async function handleQuestionClick(question) {
     setLoading(true);
@@ -10296,26 +10685,67 @@ function ChatQuery({
       color: '#666',
       marginBottom: '8px'
     }
-  }, "\uD83C\uDF10 Need more info? (requires internet)"), /*#__PURE__*/react.createElement("button", {
+  }, "\uD83D\uDD0D Google Search"), /*#__PURE__*/react.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px'
+    }
+  }, /*#__PURE__*/react.createElement("button", {
     className: "suggestion-button",
     style: {
-      backgroundColor: '#1a73e8',
-      color: 'white'
+      backgroundColor: '#1e40af',
+      color: 'white',
+      padding: '12px 16px',
+      borderRadius: '8px',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+      width: '100%'
     },
-    onClick: () => {
-      const searchQuery = encodeURIComponent(selectedEntity.name);
-      const googleUrl = `https://www.google.com/search?q=${searchQuery}`;
-      chrome.tabs.create({
-        url: googleUrl
-      });
+    onClick: handleSimpleGoogleSearch
+  }, "Search \"", selectedEntity.name, "\""), /*#__PURE__*/react.createElement("button", {
+    className: "suggestion-button",
+    style: {
+      backgroundColor: generatingAiQuestion ? '#475569' : '#10b981',
+      color: 'white',
+      padding: '12px 16px',
+      borderRadius: '8px',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      opacity: generatingAiQuestion ? 0.8 : 1,
+      cursor: generatingAiQuestion ? 'not-allowed' : 'pointer',
+      transition: 'all 0.2s ease',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+      width: '100%'
+    },
+    onClick: generatingAiQuestion ? undefined : handleAiQuestionSearch,
+    disabled: generatingAiQuestion
+  }, generatingAiQuestion ? /*#__PURE__*/react.createElement("span", null, "\uD83D\uDCA1 Finding research angle...") : aiQuestion ? /*#__PURE__*/react.createElement("span", null, "\uD83D\uDCA1 ", aiQuestion) : /*#__PURE__*/react.createElement("span", null, "\uD83D\uDCA1 Suggest research direction"))), aiQuestion && !generatingAiQuestion && /*#__PURE__*/react.createElement("p", {
+    style: {
+      fontSize: '10px',
+      color: '#888',
+      marginTop: '4px',
+      fontStyle: 'italic'
     }
-  }, "\uD83D\uDD0D Search \"", selectedEntity.name, "\" with Google"))), answer && /*#__PURE__*/react.createElement("div", {
+  }, "Suggestion based on your reading connections"))), answer && /*#__PURE__*/react.createElement("div", {
     className: "chat-answer"
-  }, /*#__PURE__*/react.createElement("p", null, answer), /*#__PURE__*/react.createElement("button", {
+  }, /*#__PURE__*/react.createElement("p", null, answer), /*#__PURE__*/react.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px',
+      marginTop: '12px'
+    }
+  }, /*#__PURE__*/react.createElement("button", {
     className: "chat-back-btn",
     onClick: () => setAnswer(''),
     style: {
-      marginTop: '12px',
       padding: '6px 12px',
       background: 'rgba(102, 126, 234, 0.1)',
       border: '1px solid rgba(102, 126, 234, 0.3)',
@@ -10324,7 +10754,7 @@ function ChatQuery({
       cursor: 'pointer',
       fontSize: '12px'
     }
-  }, "\u2190 Ask another question")), loading && /*#__PURE__*/react.createElement("div", {
+  }, "\u2190 Ask another question"))), loading && /*#__PURE__*/react.createElement("div", {
     className: "chat-loading"
   }, /*#__PURE__*/react.createElement("div", {
     className: "spinner"
@@ -10673,7 +11103,7 @@ function ArticlesList({
         setUserTopics(topics);
 
         // Compute clusters and connections with topic awareness
-        const clusteredData = clusterArticles(articlesList, 2, entityMap, topics);
+        const clusteredData = clusterArticles(articlesList, 1, entityMap, topics);
         setClusters(clusteredData);
 
         // Expand all clusters by default
@@ -10758,12 +11188,12 @@ function ArticlesList({
       className: "articles-list-panel"
     }, /*#__PURE__*/react.createElement("div", {
       className: "articles-header"
-    }, /*#__PURE__*/react.createElement("h3", null, "Your Articles"), /*#__PURE__*/react.createElement("button", {
+    }, /*#__PURE__*/react.createElement("h3", null, "Your Artifacts"), /*#__PURE__*/react.createElement("button", {
       className: "close-btn",
       onClick: onClose
     }, "\u2715")), /*#__PURE__*/react.createElement("div", {
       className: "articles-body"
-    }, /*#__PURE__*/react.createElement("p", null, "Loading articles...")));
+    }, /*#__PURE__*/react.createElement("p", null, "Loading artifacts...")));
   }
   function renderProcessingArticleCard(article) {
     return /*#__PURE__*/react.createElement("div", {
@@ -10848,7 +11278,7 @@ function ArticlesList({
     }, "Open original \u2192"), /*#__PURE__*/react.createElement("button", {
       className: "article-delete",
       onClick: e => handleDeleteArticle(article.id, e),
-      title: "Delete article"
+      title: "Delete artifact"
     }, "Delete"))));
   }
   function renderRecentView() {
@@ -10899,7 +11329,7 @@ function ArticlesList({
     className: "articles-list-panel"
   }, /*#__PURE__*/react.createElement("div", {
     className: "articles-header"
-  }, /*#__PURE__*/react.createElement("h3", null, "Your Articles (", articles.length, ")"), /*#__PURE__*/react.createElement("button", {
+  }, /*#__PURE__*/react.createElement("h3", null, "Your Artifacts (", articles.length, ")"), /*#__PURE__*/react.createElement("button", {
     className: "close-btn",
     onClick: onClose
   }, "\u2715")), /*#__PURE__*/react.createElement("div", {
@@ -10914,7 +11344,7 @@ function ArticlesList({
     className: "articles-body"
   }, articles.length === 0 ? /*#__PURE__*/react.createElement("p", {
     className: "no-articles"
-  }, "No articles yet") : /*#__PURE__*/react.createElement(react.Fragment, null, viewMode === 'recent' ? renderRecentView() : renderConnectedView())), showingConnectionFor && /*#__PURE__*/react.createElement("div", {
+  }, "No artifacts yet") : /*#__PURE__*/react.createElement(react.Fragment, null, viewMode === 'recent' ? renderRecentView() : renderConnectedView())), showingConnectionFor && /*#__PURE__*/react.createElement("div", {
     className: "connection-modal-overlay",
     onClick: closeConnectionModal
   }, /*#__PURE__*/react.createElement("div", {
@@ -11039,20 +11469,8 @@ ArticleEntitiesPanel.propTypes = {
 
 
 function WelcomeScreen({
-  onStartFresh,
-  onLoadDemo
+  onStartFresh
 }) {
-  const [loading, setLoading] = (0,react.useState)(false);
-  async function handleLoadDemo() {
-    setLoading(true);
-    try {
-      await onLoadDemo();
-    } catch (error) {
-      console.error('Failed to load demo:', error);
-      alert('Failed to load demo data. Please try again.');
-      setLoading(false);
-    }
-  }
   return /*#__PURE__*/react.createElement("div", {
     className: "welcome-screen"
   }, /*#__PURE__*/react.createElement("div", {
@@ -11206,14 +11624,9 @@ function WelcomeScreen({
   }, "\u26A1"), /*#__PURE__*/react.createElement("h3", null, "Instant & Offline"), /*#__PURE__*/react.createElement("p", null, "Works without internet, powered by Chrome Built-in AI")))), /*#__PURE__*/react.createElement("div", {
     className: "welcome-actions"
   }, /*#__PURE__*/react.createElement("button", {
-    className: "btn-primary btn-demo",
-    onClick: handleLoadDemo,
-    disabled: loading
-  }, loading ? 'Loading Demo...' : '🎯 Try Demo Data'), /*#__PURE__*/react.createElement("button", {
-    className: "btn-secondary",
-    onClick: onStartFresh,
-    disabled: loading
-  }, "Start Fresh")), /*#__PURE__*/react.createElement("div", {
+    className: "btn-primary",
+    onClick: onStartFresh
+  }, "\u2699\uFE0F Settings")), /*#__PURE__*/react.createElement("div", {
     className: "welcome-footer"
   }, /*#__PURE__*/react.createElement("p", {
     className: "welcome-hint"
@@ -11429,8 +11842,7 @@ function WelcomeScreen({
       `));
 }
 WelcomeScreen.propTypes = {
-  onStartFresh: (prop_types_default()).func.isRequired,
-  onLoadDemo: (prop_types_default()).func.isRequired
+  onStartFresh: (prop_types_default()).func.isRequired
 };
 /* harmony default export */ const components_WelcomeScreen = (WelcomeScreen);
 ;// ./src/graph-page/components/TimelineSlider.jsx
@@ -11701,7 +12113,7 @@ function GraphPage() {
           articles: statsResponse.statistics.totalArticles || 0
         });
 
-        // Show welcome screen if no articles exist
+        // Show welcome screen if no artifacts exist
         if (statsResponse.statistics.totalArticles === 0) {
           setShowWelcome(true);
         }
@@ -11767,23 +12179,9 @@ function GraphPage() {
   function handleEntityClick(entity) {
     setSelectedNode(entity);
   }
-  async function handleLoadDemo() {
-    try {
-      // Load demo data
-      await chrome.runtime.sendMessage({
-        type: 'LOAD_MOCK_DATA',
-        entityCount: 50
-      });
-      // Reload graph
-      await loadGraphData();
-      setShowWelcome(false);
-    } catch (error) {
-      console.error('Failed to load demo:', error);
-      throw error;
-    }
-  }
   function handleStartFresh() {
     setShowWelcome(false);
+    setActiveTab('settings');
   }
   function handleTimelineArticleSelect(article) {
     setTimelineFocusedArticle(article);
@@ -11814,8 +12212,7 @@ function GraphPage() {
   // Show welcome screen on first run
   if (showWelcome && stats.articles === 0) {
     return /*#__PURE__*/react.createElement(components_WelcomeScreen, {
-      onStartFresh: handleStartFresh,
-      onLoadDemo: handleLoadDemo
+      onStartFresh: handleStartFresh
     });
   }
   if (graphData.nodes.length === 0 && activeTab === 'graph') {
@@ -11856,7 +12253,7 @@ function GraphPage() {
         fontSize: '16px',
         opacity: 0.8
       }
-    }, "Browse to any article and click the Glyph icon to capture insights"))));
+    }, "Browse to any artifact and click the Glyph icon to capture insights"))));
   }
   return /*#__PURE__*/react.createElement("div", {
     className: "graph-page"
@@ -11872,7 +12269,7 @@ function GraphPage() {
     className: "tagline"
   }, "Your Chrome-powered AI. 100% Local & Private")), activeTab === 'graph' && /*#__PURE__*/react.createElement("div", {
     className: "stats-mini"
-  }, /*#__PURE__*/react.createElement("span", null, stats.entities, " entities"), /*#__PURE__*/react.createElement("span", null, stats.connections, " connections"), /*#__PURE__*/react.createElement("span", null, stats.articles, " articles"))), activeTab === 'graph' && /*#__PURE__*/react.createElement(components_SearchBar, {
+  }, /*#__PURE__*/react.createElement("span", null, stats.entities, " entities"), /*#__PURE__*/react.createElement("span", null, stats.connections, " connections"), /*#__PURE__*/react.createElement("span", null, stats.articles, " artifacts"))), activeTab === 'graph' && /*#__PURE__*/react.createElement(components_SearchBar, {
     onSearch: handleSearch,
     placeholder: "Search entities..."
   }), /*#__PURE__*/react.createElement("div", {
@@ -11880,8 +12277,8 @@ function GraphPage() {
   }, activeTab === 'graph' && /*#__PURE__*/react.createElement("button", {
     className: "articles-button",
     onClick: () => setShowArticlesList(true),
-    title: "View all articles"
-  }, "\uD83D\uDCC4 Articles (", stats.articles, ")"), /*#__PURE__*/react.createElement("nav", {
+    title: "View all artifacts"
+  }, "\uD83D\uDCC4 Artifacts (", stats.articles, ")"), /*#__PURE__*/react.createElement("nav", {
     className: "tabs"
   }, /*#__PURE__*/react.createElement("button", {
     className: activeTab === 'graph' ? 'active' : '',
@@ -11945,7 +12342,7 @@ function GraphPage() {
   }))), activeTab === 'insights' && /*#__PURE__*/react.createElement("div", {
     className: "insights-container"
   }, /*#__PURE__*/react.createElement(components_InsightPanel, {
-    graphData: graphData,
+    graphData: fullGraphData,
     stats: stats,
     onEntityClick: entity => {
       setActiveTab('graph');

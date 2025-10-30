@@ -224,11 +224,12 @@ function KnowledgeGraph({ data, selectedNode, onNodeClick, searchQuery, highligh
     node.append('circle')
       .attr('r', d => {
         const baseSize = GRAPH_CONFIG.DEFAULT_NODE_SIZE;
-        const degreeBonus = Math.sqrt(d.degree || 0) * 2;
+        // Enhanced degree bonus - more dramatic size differences
+        const degreeBonus = Math.sqrt(d.degree || 0) * 3;
         const highlightBonus = isHighlighted(d) ? 3 : 0;
         // Primary nodes (from selected article) are larger
         const primaryBonus = d.isFromSelectedArticle ? 4 : 0;
-        return baseSize + degreeBonus + highlightBonus + primaryBonus;
+        return Math.min(baseSize + degreeBonus + highlightBonus + primaryBonus, 24); // Cap max size
       })
       .attr('fill', d => colorScale[d.type] || '#6b7280')
       .attr('stroke', d => {
@@ -251,7 +252,35 @@ function KnowledgeGraph({ data, selectedNode, onNodeClick, searchQuery, highligh
         return d.isFromSelectedArticle ? 1 : 0.7;
       })
       .style('cursor', 'pointer')
-      .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))');
+      .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))')
+      .on('mouseenter', function(event, d) {
+        // Highlight connected nodes and edges on hover
+        const connectedNodeIds = new Set();
+
+        // Find all connected nodes
+        links.forEach(link => {
+          if (link.source.id === d.id) connectedNodeIds.add(link.target.id);
+          if (link.target.id === d.id) connectedNodeIds.add(link.source.id);
+        });
+
+        // Dim non-connected nodes
+        node.selectAll('circle')
+          .style('opacity', nodeData => {
+            if (nodeData.id === d.id) return 1; // Keep current node bright
+            return connectedNodeIds.has(nodeData.id) ? 0.8 : 0.3;
+          });
+
+        // Highlight connected edges
+        link.style('opacity', linkData => {
+          return (linkData.source.id === d.id || linkData.target.id === d.id) ? 1 : 0.1;
+        });
+      })
+      .on('mouseleave', function() {
+        // Reset all opacities
+        node.selectAll('circle')
+          .style('opacity', d => isDimmed(d) ? 0.3 : (d.isFromSelectedArticle ? 1 : 0.7));
+        link.style('opacity', 0.6);
+      });
 
     // Add labels to nodes
     node.append('text')
@@ -352,11 +381,6 @@ function KnowledgeGraph({ data, selectedNode, onNodeClick, searchQuery, highligh
       }
     });
 
-    // Add title tooltips
-    node.append('title')
-      .text(d => {
-        return `${d.name}\nType: ${d.type}\nTopic: ${d.topic}\nConnections: ${d.degree || 0}`;
-      });
 
     // Update positions on each tick
     simulation.on('tick', () => {

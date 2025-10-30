@@ -28,7 +28,7 @@ The architecture includes availability checking, elegant failure handling, and p
 The service worker coordinates AI calls without blocking browser performance. It handles multiple articles simultaneously using Chrome's built-in AI, managing processing queues and state across tabs. All AI sessions are properly cleaned up to prevent memory leaks.
 
 **Content Extraction** (content-script.js)
-Extracts article content only when users explicitly click "Capture Article" - no passive tracking or automatic data collection. Includes duplicate detection and provides hints about related articles already in the knowledge graph.
+Extracts article content only when users explicitly click "Capture Artifact" - no passive tracking or automatic data collection. Includes duplicate detection and provides hints about related articles already in the knowledge graph.
 
 **Knowledge Visualization** (graph-page/, popup/)
 React-based interface that visualizes knowledge connections through D3.js force-directed graphs. Components designed with accessibility support including keyboard navigation and screen readers.

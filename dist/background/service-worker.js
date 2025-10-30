@@ -646,8 +646,6 @@ async function getGraphEngine() {
 }
 /* harmony default export */ const graph_engine = ((/* unused pure expression or super */ null && (GraphEngine)));
 ;// ./src/utils/availability.js
-// AI API availability checking for Chrome's built-in AI
-
 /**
  * Check if Chrome's Prompt API is available and ready
  * @returns {Promise<Object>} Availability status object
@@ -793,9 +791,7 @@ async function waitForAIAvailability(checkFunction, timeoutMs = 30000, pollInter
   waitForAIAvailability
 });
 ;// ./src/utils/constants.js
-// Application constants and configuration
-
-// Entity types
+// Entity types for knowledge graph nodes
 const ENTITY_TYPES = {
   PERSON: 'person',
   COMPANY: 'company',
@@ -803,7 +799,7 @@ const ENTITY_TYPES = {
   CONCEPT: 'concept'
 };
 
-// Relationship types
+// Relationship types for graph connections
 const RELATIONSHIP_TYPES = {
   DIRECT: 'direct',
   CONCEPTUAL: 'conceptual',
@@ -811,23 +807,19 @@ const RELATIONSHIP_TYPES = {
   CAUSAL: 'causal'
 };
 
-// AI API configuration
+// Chrome AI API configuration
 const AI_CONFIG = {
   MAX_ARTICLE_CHARS: 6000,
-  // Reduced for faster processing
   MAX_ENTITIES_PER_ARTICLE: 8,
-  // Reduced for faster processing
   MAX_RELATIONSHIP_CANDIDATES: 8,
-  // Reduced for faster processing
   ENTITY_EXTRACTION_TEMPERATURE: 0.3,
   RELATIONSHIP_INFERENCE_TEMPERATURE: 0.3,
   SUMMARIZER_LENGTH: 'short',
-  // Changed to 'short' for faster processing
   SUMMARIZER_TYPE: 'key-points',
   SUMMARIZER_FORMAT: 'markdown'
 };
 
-// Graph visualization configuration
+// Graph visualization settings
 const GRAPH_CONFIG = {
   CANVAS_THRESHOLD: 200,
   FORCE_STRENGTH: -30,
@@ -838,7 +830,7 @@ const GRAPH_CONFIG = {
   LINK_WIDTH: 1.5
 };
 
-// UI configuration
+// UI layout configuration
 const UI_CONFIG = {
   POPUP_WIDTH: 800,
   POPUP_HEIGHT: 600,
@@ -846,10 +838,10 @@ const UI_CONFIG = {
   RECENT_ARTICLES_LIMIT: 10
 };
 
-// Default user topics
+// Default user interests
 const DEFAULT_TOPICS = ['AI', 'Technology', 'Science', 'Business', 'Innovation'];
 
-// Storage keys
+// Storage configuration
 const STORAGE_KEYS = {
   USER_SETTINGS: 'user_settings'
 };
@@ -2512,7 +2504,6 @@ function generateSampleData() {
   };
 }
 ;// ./src/background/service-worker.js
-// Background service worker for coordinating AI operations
 
 
 
@@ -2523,28 +2514,18 @@ function generateSampleData() {
 
 
 
-// Initialize on install
+// Initialize extension on install/startup
 chrome.runtime.onInstalled.addListener(() => {
   initializeExtension();
   setupContextMenus();
 });
-
-// Removed complex icon indicators - keeping it simple
-
 async function initializeExtension() {
   try {
-    // Initialize database
     const store = await getGraphStore();
-
-    // Set default settings if not exists
     const settings = await store.getSettings();
     if (!settings.id) {
       await store.updateSettings(settings);
     }
-
-    // Initialize badge
-
-    // Check AI availability
     await checkAllAIAvailability();
   } catch (error) {
     console.error('Initialization failed:', error);
@@ -2559,11 +2540,6 @@ function setupContextMenus() {
     contexts: ['page']
   });
   chrome.contextMenus.create({
-    id: 'captureImage',
-    title: 'Extract from Image',
-    contexts: ['image']
-  });
-  chrome.contextMenus.create({
     id: 'captureAllTabs',
     title: 'Capture All Tabs',
     contexts: ['page']
@@ -2574,8 +2550,6 @@ function setupContextMenus() {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'captureArticle') {
     captureCurrentTab(tab);
-  } else if (info.menuItemId === 'captureImage') {
-    captureImage(info.srcUrl, tab);
   } else if (info.menuItemId === 'captureAllTabs') {
     captureAllOpenTabs();
   }
@@ -2618,10 +2592,10 @@ async function handleMessage(message, sender) {
       return await queryKnowledge(message.query);
     case 'ANSWER_ENTITY_QUESTION':
       return await answerEntityQuestion(message.entityId, message.questionType);
+    case 'GENERATE_AI_QUESTION':
+      return await generateAiResearchQuestion(message.prompt);
     case 'CAPTURE_CURRENT_TAB':
       return await captureCurrentTab(message.tab);
-    case 'CAPTURE_IMAGE':
-      return await captureImage(message.imageUrl, message.tab);
     case 'CAPTURE_ALL_TABS':
       return await captureAllOpenTabs();
     case 'DISCOVER_RELATIONSHIPS':
@@ -2635,7 +2609,7 @@ async function handleMessage(message, sender) {
     case 'TEST_WRITER_API':
       return await testWriterAPI();
     case 'SYNTHESIZE_WEEK':
-      synthesizeWeekBackground();
+      synthesizeWeekBackground(message.weekStart, message.force);
       return {
         success: true,
         message: 'Synthesis started in background. Check back in a few moments.'
@@ -2747,9 +2721,9 @@ async function captureArticle(data) {
     const engine = await getGraphEngine();
     await engine.loadGraph();
 
-    // Discover relationships automatically every 5 articles (less frequent for performance)
+    // Discover relationships automatically after each article
     const allArticles = await store.getAllArticles();
-    if (allArticles.length % 5 === 0 && allArticles.length > 0) {
+    if (allArticles.length >= 2) {
       // Run relationship discovery in background after capture completes to not block
       setTimeout(async () => {
         try {
@@ -2767,7 +2741,7 @@ async function captureArticle(data) {
     // Notify popup to refresh
     chrome.runtime.sendMessage({
       type: 'GRAPH_UPDATED'
-    });
+    }).catch(() => {});
     notifyProcessingStatus('Article captured successfully!', false);
 
     // Cleanup: remove URL from processing queue
@@ -2966,7 +2940,7 @@ async function loadMockData(entityCount = 50) {
     // Notify popup to refresh
     chrome.runtime.sendMessage({
       type: 'GRAPH_UPDATED'
-    });
+    }).catch(() => {});
     notifyProcessingStatus('Mock data loaded successfully!', false);
     return {
       success: true,
@@ -3159,97 +3133,6 @@ async function getCurrentTab() {
     currentWindow: true
   });
   return tabs[0];
-}
-
-// Capture image with multimodal AI
-async function captureImage(imageUrl, tab) {
-  try {
-    // console.log('Capturing image:', imageUrl);
-
-    // Download image
-    const response = await fetch(imageUrl);
-    const blob = await response.blob();
-
-    // Convert to File
-    const file = new File([blob], 'image.jpg', {
-      type: blob.type
-    });
-
-    // Extract entities from image using multimodal Prompt API
-    const entities = await extractEntitiesFromImage(file, tab.url);
-    if (entities.length > 0) {
-      // Store entities
-      const store = await getGraphStore();
-      for (const entityData of entities) {
-        const entity = createEntity(entityData.name, entityData.type, entityData.topic || 'General', `From image: ${imageUrl}`);
-        entity.sources = [tab.url];
-        entity.metadata.imageSource = imageUrl;
-        await store.addEntity(entity);
-      }
-
-      // Update badge
-      await
-      // Notify
-      chrome.notifications.create({
-        type: 'basic',
-        iconUrl: '/icons/icon128.ico',
-        title: 'Image Saved',
-        message: `Found ${entities.length} entities in image`
-      });
-    }
-    return {
-      success: true,
-      entityCount: entities.length
-    };
-  } catch (error) {
-    console.error('Image capture failed:', error);
-    throw error;
-  }
-}
-
-// Extract entities from image using multimodal Prompt API
-async function extractEntitiesFromImage(imageFile, sourceUrl) {
-  try {
-    // Check if multimodal is available
-    if (typeof LanguageModel === 'undefined') {
-      throw new Error('Prompt API not available');
-    }
-
-    // Create session with multimodal support
-    const session = await LanguageModel.create({
-      systemPrompt: 'You extract entities from images. Return JSON only.',
-      expectedInputs: [{
-        type: 'image'
-      }, {
-        type: 'text'
-      }]
-    });
-
-    // Append image
-    await session.append([{
-      role: 'user',
-      content: [{
-        type: 'image',
-        value: imageFile
-      }, {
-        type: 'text',
-        value: `Extract key entities from this image.
-Return JSON array: [{"name": "Entity Name", "type": "person|company|technology|concept", "relevance": 0.8}]`
-      }]
-    }]);
-
-    // Get response
-    const response = await session.prompt('List the entities as JSON.');
-
-    // Parse
-    const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const entities = JSON.parse(cleaned);
-    session.destroy();
-    return entities;
-  } catch (error) {
-    console.error('Image entity extraction failed:', error);
-    return []; // Fallback to empty
-  }
 }
 
 // Capture all open tabs
@@ -3479,6 +3362,45 @@ async function answerEntityQuestion(entityId, questionType) {
     };
   } catch (error) {
     console.error('Answer entity question failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+async function generateAiResearchQuestion(prompt) {
+  try {
+    // Check if Prompt API is available
+    if (typeof LanguageModel === 'undefined' || typeof LanguageModel.create !== 'function') {
+      return {
+        success: false,
+        error: 'Prompt API not available'
+      };
+    }
+
+    // Create AI session for question generation
+    const session = await LanguageModel.create({
+      systemPrompt: 'You are a research assistant that generates focused, searchable research questions. Keep responses concise and specific.'
+    });
+    const response = await session.prompt(prompt);
+
+    // Clean up the response
+    let question = response.trim();
+
+    // Remove quotes if present
+    question = question.replace(/^["']|["']$/g, '');
+
+    // Ensure it doesn't end with a question mark for search queries
+    question = question.replace(/\?$/, '');
+
+    // Cleanup session
+    session.destroy();
+    return {
+      success: true,
+      question: question
+    };
+  } catch (error) {
+    console.error('AI question generation failed:', error);
     return {
       success: false,
       error: error.message
@@ -3866,7 +3788,7 @@ async function testWriterAPI() {
 }
 
 // Synthesize weekly learning using Writer API
-async function synthesizeWeek() {
+async function synthesizeWeek(weekStart = null, force = false) {
   try {
     // Check Writer API availability
     if (typeof Writer === 'undefined' || typeof Writer.create !== 'function') {
@@ -3891,23 +3813,22 @@ async function synthesizeWeek() {
     }
     const store = await getGraphStore();
 
-    // Get articles from last 7 days
+    // Get ALL articles (no week filtering)
     const allArticles = await store.getAllArticles();
-    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recentArticles = allArticles.filter(a => a.capturedAt >= oneWeekAgo);
-    if (recentArticles.length === 0) {
+    console.log(`Found ${allArticles.length} total articles:`, allArticles.map(a => a.title));
+    if (allArticles.length === 0) {
       return {
         success: false,
-        error: 'No articles captured in the last 7 days'
+        error: 'No articles captured yet'
       };
     }
 
     // Get all entities
     const allEntities = await store.getAllEntities();
 
-    // Count entity frequencies from recent articles
+    // Count entity frequencies from all articles
     const entityFrequency = new Map();
-    for (const article of recentArticles) {
+    for (const article of allArticles) {
       for (const entityId of article.entities || []) {
         entityFrequency.set(entityId, (entityFrequency.get(entityId) || 0) + 1);
       }
@@ -3936,10 +3857,10 @@ async function synthesizeWeek() {
 
     // Build prompt with article and entity data
     const entityList = topEntities.map(e => `- ${e.name} (${e.type}, appeared ${e.frequency} times)`).join('\n');
-    const articleTitles = recentArticles.slice(0, 10).map(a => `- "${a.title}"`).join('\n');
-    const prompt = `Based on the following learning data from the past week, write a 150-200 word narrative synthesis that tells the story of this person's intellectual journey. Focus on themes, connections, and insights rather than just listing topics.
+    const articleTitles = allArticles.slice(0, 10).map(a => `- "${a.title}"`).join('\n');
+    const prompt = `Based on the following learning data, write a 150-200 word narrative synthesis that tells the story of this person's intellectual journey. Focus on themes, connections, and insights rather than just listing topics.
 
-Articles Read (${recentArticles.length} total):
+Articles Read (${allArticles.length} total):
 ${articleTitles}
 
 Most Frequent Entities:
@@ -3959,25 +3880,24 @@ Synthesis:`;
 
     // Store synthesis in database with timestamp
     const now = Date.now();
-    const weekStart = oneWeekAgo;
     const synthesisId = `synthesis_${now}`;
     const synthesisRecord = {
       id: synthesisId,
       synthesis: synthesis.trim(),
       createdAt: now,
-      weekStart: weekStart,
-      weekEnd: now,
-      articlesAnalyzed: recentArticles.length,
+      weekStart: now,
+      // Keep for UI compatibility but just use current time
+      articlesAnalyzed: allArticles.length,
       topEntities: topEntities.slice(0, 5).map(e => e.name)
     };
     await store.db.add('syntheses', synthesisRecord);
     return {
       success: true,
       synthesis: synthesis.trim(),
-      articlesAnalyzed: recentArticles.length,
+      articlesAnalyzed: allArticles.length,
       topEntities: topEntities.slice(0, 5).map(e => e.name),
       createdAt: now,
-      weekStart: weekStart
+      weekStart: now
     };
   } catch (error) {
     console.error('Weekly synthesis failed:', error);
@@ -3987,9 +3907,9 @@ Synthesis:`;
     };
   }
 }
-async function synthesizeWeekBackground() {
+async function synthesizeWeekBackground(weekStart, force = false) {
   try {
-    const result = await synthesizeWeek();
+    const result = await synthesizeWeek(weekStart, force);
     if (result.success) {
       console.log('Weekly synthesis completed in background');
       chrome.runtime.sendMessage({
