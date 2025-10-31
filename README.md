@@ -1,6 +1,7 @@
 # Glyph
 
 **Curate your learning. See how ideas connect.**
+*Powered by Chrome's built-in AI*
 
 ![Glyph Demo](docs/Glyph_demo.gif)
 
