@@ -1,11 +1,13 @@
 # Glyph
 
+[![Built with Gemini Nano](https://img.shields.io/badge/Built%20with-Gemini%20Nano-4285f4?logo=google&logoColor=white)](https://developer.chrome.com/docs/ai/built-in-apis) [![Chrome 138+](https://img.shields.io/badge/Chrome-138%2B-4285f4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
+
 **Curate your learning. See how ideas connect.**
 *Powered by Chrome's built-in AI*
 
 ![Glyph Demo](docs/Glyph_demo.gif)
 
-Glyph turns scattered reading into structured knowledge. Every article you capture becomes part of an intelligent graph that reveals patterns, connections, and insights across everything you've read.
+Glyph turns scattered reading into structured knowledge. Build private knowledge graphs from your browsing - entirely on-device. Every article you capture becomes part of an intelligent graph that reveals patterns, connections, and insights across everything you've read.
 
 **If you learn by reading** - whether you're researching, practicing law, analyzing markets, or just trying to make sense of complex topics - Glyph helps you see the bigger picture.
 
