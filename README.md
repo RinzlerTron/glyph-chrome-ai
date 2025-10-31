@@ -2,6 +2,8 @@
 
 **Curate your learning. See how ideas connect.**
 
+![Glyph Demo](docs/Glyph_demo.gif)
+
 Glyph turns scattered reading into structured knowledge. Every article you capture becomes part of an intelligent graph that reveals patterns, connections, and insights across everything you've read.
 
 **If you learn by reading** - whether you're researching, practicing law, analyzing markets, or just trying to make sense of complex topics - Glyph helps you see the bigger picture.
