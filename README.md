@@ -38,7 +38,7 @@ Ask questions and get answers drawn from your own curated knowledge. "What have 
 | What You See | Intelligence Behind It |
 |--------------|------------------------|
 | **Capture article** | Summarizer condenses → Prompt API extracts entities → Language Detector identifies language |
-| **Visual graph grows** | D3.js physics simulation (no AI) |
+| **Visual graph grows** | D3.js physics simulation |
 | **Relationships appear** | Statistical analysis finds co-occurrence patterns → Prompt API labels them semantically |
 | **Ask questions** | Prompt API answers from your data → Rewriter polishes clarity |
 | **Weekly synthesis** | Writer API generates narrative summaries of your learning journey |
